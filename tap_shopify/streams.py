@@ -2,9 +2,12 @@
 
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 from urllib.parse import parse_qsl, urlsplit
 
+import requests
+
+from singer_sdk.helpers.jsonpath import extract_jsonpath
 from singer_sdk.helpers._classproperty import classproperty
 from singer_sdk.typing import JSONTypeHelper
 
@@ -68,13 +71,29 @@ class CollectStream(tap_shopifyStream):
 class CustomCollections(tap_shopifyStream):
     """Custom collections stream."""
 
-    name = "custom_collections"
+    name = "categories"
     path = "/api/2022-01/custom_collections.json"
     records_jsonpath = "$.custom_collections[*]"
     primary_keys = ["id"]
-    replication_key = "updated_at"
-    replication_method = "INCREMENTAL"
     schema_filepath = SCHEMAS_DIR / "custom_collection.json"
+
+    def parse_response(self, response: requests.Response) -> Iterable[dict]:
+        def preprocess_input(data):
+            data_convert = []
+            for item in data['custom_collections']:
+                raw_data = {
+                    "id": item['id'],
+                    "name": item['title'],
+                    "updated_at": item['updated_at'],
+                    "source": "shopify"
+                }
+                data_convert.append(raw_data)
+            return data_convert
+        processed_data = response.json()
+        res = preprocess_input(processed_data)
+        yield from extract_jsonpath(self.records_jsonpath, input={
+            "custom_collections": res
+        })
 
 
 class CustomersStream(tap_shopifyStream):
@@ -179,9 +198,46 @@ class ProductsStream(tap_shopifyStream):
     path = "/api/2022-01/products.json"
     records_jsonpath = "$.products[*]"
     primary_keys = ["id"]
-    replication_key = "updated_at"
-    replication_method = "INCREMENTAL"
     schema_filepath = SCHEMAS_DIR / "product.json"
+
+    def parse_response(self, response: requests.Response) -> Iterable[dict]:
+        def preprocess_input(data):
+            data_convert = []
+            for item in data['products']:
+                raw_data = {
+                    "id": item['id'],
+                    "name": item['title'],
+                    "sku": item['handle'],
+                    "created_at": item['created_at'],
+                    "updated_at": item['updated_at'],
+                    "options": [],
+                    "media_gallery_entries": [],
+                    "source": "shopify"
+                }
+                for variant in item['variants']:
+                    raw_data['options'].append({
+                        "product_sku": variant['sku'],
+                        "title": variant['title'],
+                        "price": variant['price'],
+                        "sku": variant['sku'],
+                        "created_at": variant['created_at'],
+                        "updated_at": variant['updated_at'],
+                    })
+                for image in item['images']:
+                    raw_data['media_gallery_entries'].append({
+                        "id": image['id'],
+                        "position": image['position'],
+                        "file": image['src'],
+                        "created_at": image['created_at'],
+                        "updated_at": image['updated_at'],
+                    })
+                data_convert.append(raw_data)
+            return data_convert
+        processed_data = response.json()
+        res = preprocess_input(processed_data)
+        yield from extract_jsonpath(self.records_jsonpath, input={
+            "products": res
+        })
 
 
 class TransactionsStream(tap_shopifyStream):
