@@ -1,5 +1,6 @@
 """Stream type classes for tap-shopify."""
 
+from collections import Counter
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
@@ -263,3 +264,50 @@ class UsersStream(tap_shopifyStream):
     replication_key = None
     replication_method = "FULL_TABLE"
     schema_filepath = SCHEMAS_DIR / "user.json"
+
+
+
+class ProductsAttributesStream(tap_shopifyStream):
+    """Products stream."""
+
+    name = "products_attribute"
+    path = "/api/2022-01/products.json"
+    records_jsonpath = "$.products[*]"
+    primary_keys = ["id"]
+    schema_filepath = SCHEMAS_DIR / "product_attribute.json"
+
+    def parse_response(self, response: requests.Response) -> Iterable[dict]:
+        def preprocess_input(data):
+            data_convert = []
+            for item in data['products']:
+                for option in item['options']:
+                    data_option = {
+                        "id": option['id'],
+                        "attribute_id": option['id'],
+                        "default_frontend_label": option['name'],
+                        "default_value": option['name'],
+                        "created_at": item['created_at'],
+                        "updated_at": item['updated_at'],
+                        "source": "shopify",
+                        "options": []
+                    }
+                    for value in option['values']:
+                        data_option['options'].append({
+                            "label": value,
+                            "value": value,
+                        })
+                    data_convert.append(data_option)
+            max_option_count = max(len(item["options"]) for item in data_convert)
+            name_counter = Counter(item["default_frontend_label"]
+                                   for item in data_convert)
+            unique_names = [name for name, count in name_counter.items() if count == 1]
+            final_objects = [
+                item for item in data_convert
+                if item["default_frontend_label"] in unique_names or len(item["options"]) == max_option_count
+            ]
+            return final_objects
+        processed_data = response.json()
+        res = preprocess_input(processed_data)
+        yield from extract_jsonpath(self.records_jsonpath, input={
+            "products": res
+        })

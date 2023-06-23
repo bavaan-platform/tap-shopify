@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer"
+    },
+    "default_frontend_label": {
+      "type": "string"
+    },
+    "attribute_id": {
+      "type": "integer"
+    },
+    "default_value": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": ["string", "null"]
+          },
+          "value": {
+            "type": ["string", "null"]
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "string"
+    }
+  }
+}
