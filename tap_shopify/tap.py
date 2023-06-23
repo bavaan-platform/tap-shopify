@@ -19,6 +19,7 @@ from tap_shopify.streams import (
     ProductsStream,
     TransactionsStream,
     UsersStream,
+    ProductsAttributesStream
 )
 
 STREAM_TYPES = [
@@ -33,6 +34,7 @@ STREAM_TYPES = [
     OrdersStream,
     ProductsStream,
     TransactionsStream,
+    ProductsAttributesStream
 ]
 
 
